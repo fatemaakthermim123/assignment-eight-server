@@ -37,18 +37,6 @@ app.get("/", (req, res) => {
 
 
 
-app.post("/all-books", async (req, res) => {
-  try {
-    const data = req.body;
-    console.log("data from client:", data);
-    const result = await userCollection.insertOne(data);
-    console.log("insert result:", result);
-    res.send(result);
-  } catch (err) {
-    console.error("insert failed:", err);
-    res.status(500).send({ error: err.message });
-  }
-});
 
 
 app.get("/all-books", async (req, res) => {
@@ -61,6 +49,12 @@ app.get("/all-books", async (req, res) => {
   }
 });
 
+app.post('/all-books', async (req, res) => {
+  console.log('data from client', req.body);
+  const newBook = req.body;
+  const result = await userCollection.insertOne(newBook);
+  res.send({ success: true, message: "successfully added", result });
+});
 
 
 app.get("/all-books/:id", async (req, res) => {

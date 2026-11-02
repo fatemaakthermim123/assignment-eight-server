@@ -28,6 +28,7 @@ app.use(express.json());
 const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("assignment-eight");
 const userCollection = db.collection("all-books");
+const myBooksCollection = db.collection("my-Books");
 
 
 app.get("/", (req, res) => {
@@ -50,10 +51,17 @@ app.get("/all-books", async (req, res) => {
 });
 
 app.post('/all-books', async (req, res) => {
-  console.log('data from client', req.body);
-  const newBook = req.body;
-  const result = await userCollection.insertOne(newBook);
-  res.send({ success: true, message: "successfully added", result });
+  try {
+    const newBook = req.body;
+
+    const result = await userCollection.insertOne(newBook);
+    await myBooksCollection.insertOne(newBook);
+
+    res.send({ success: true, message: "successfully added", result });
+  } catch (err) {
+    console.error("insert failed:", err);
+    res.status(500).send({ error: err.message });
+  }
 });
 
 
@@ -78,12 +86,18 @@ app.get("/all-books/:id", async (req, res) => {
   }
 });
 
-
-
-
-
-
-
+app.get('/my-books/:email', async (req, res) => {
+  try {
+    const { email } = req.params;
+    const result = await myBooksCollection
+      .find({ addedByEmail: email })
+      .toArray();
+    res.send(result);
+  } catch (err) {
+    console.error("my-books find failed:", err);
+    res.status(500).send({ error: err.message });
+  }
+});
 
 
 app.listen(PORT, () => {

@@ -50,6 +50,22 @@ app.get("/all-books", async (req, res) => {
   }
 });
 
+
+app.get("/latest-books", async (req, res) => {
+  try {
+    const result = await userCollection
+      .find()
+      .sort({ _id: -1 })
+      .limit(8)
+      .toArray();
+
+    res.send(result);
+  } catch (err) {
+    console.error("latest books fetch failed:", err);
+    res.status(500).send({ error: err.message });
+  }
+});
+
 app.post('/all-books', async (req, res) => {
   try {
     const newBook = req.body;

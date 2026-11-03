@@ -29,6 +29,7 @@ const mongoClient = await connectToMongoDB();
 const db = mongoClient.db("assignment-eight");
 const userCollection = db.collection("all-books");
 const myBooksCollection = db.collection("my-Books");
+const borrowsCollection = db.collection("borrows");
 
 
 app.get("/", (req, res) => {
@@ -114,7 +115,7 @@ app.get('/my-books/:email', async (req, res) => {
     res.status(500).send({ error: err.message });
   }
 });
-
+// বই এডিট
 app.patch('/all-books/:id', async (req, res) => {
   const { id } = req.params;
   const data = req.body;
@@ -131,14 +132,87 @@ app.patch('/all-books/:id', async (req, res) => {
   res.json(result);
 });
 
+// বই ডিলিট (ওই বইয়ের borrow রেকর্ডও মুছে যায়)
 app.delete('/all-books/:id', async (req, res) => {
   const { id } = req.params;
 
   const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
   await myBooksCollection.deleteOne({ _id: new ObjectId(id) });
+  await borrowsCollection.deleteMany({ bookId: id });
 
   res.json(result);
-}); 
+});
+
+// Borrow
+app.post('/borrows', async (req, res) => {
+  const { bookId, bookTitle, bookImage, userEmail } = req.body;
+
+  // একই ইউজার একই বই দুইবার নিতে পারবে না
+  const already = await borrowsCollection.findOne({ bookId, userEmail });
+  if (already) {
+    return res.status(400).send({ error: "You have already borrowed this book" });
+  }
+
+  // কপি ১ বা বেশি থাকলে তবেই ১ কমবে
+  const updated = await userCollection.updateOne(
+    { _id: new ObjectId(bookId), availableCopies: { $gt: 0 } },
+    { $inc: { availableCopies: -1 } },
+  );
+  if (updated.modifiedCount === 0) {
+    return res.status(400).send({ error: "No copies available" });
+  }
+
+  await myBooksCollection.updateOne(
+    { _id: new ObjectId(bookId) },
+    { $inc: { availableCopies: -1 } },
+  );
+
+  const borrowDate = new Date();
+  const returnDate = new Date();
+  returnDate.setDate(returnDate.getDate() + 7);
+
+  const result = await borrowsCollection.insertOne({
+    bookId,
+    bookTitle,
+    bookImage,
+    userEmail,
+    borrowDate,
+    returnDate,
+  });
+
+  res.send({ success: true, result });
+});
+
+// ইউজারের সব borrow
+app.get('/borrows/:email', async (req, res) => {
+  const result = await borrowsCollection
+    .find({ userEmail: req.params.email })
+    .toArray();
+  res.send(result);
+});
+
+// Return: রেকর্ড মুছে যায়, কপি ১ বাড়ে
+app.delete('/borrows/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const borrow = await borrowsCollection.findOne({ _id: new ObjectId(id) });
+  if (!borrow) {
+    return res.status(404).send({ error: "Borrow record not found" });
+  }
+
+  await borrowsCollection.deleteOne({ _id: new ObjectId(id) });
+
+  await userCollection.updateOne(
+    { _id: new ObjectId(borrow.bookId) },
+    { $inc: { availableCopies: 1 } },
+  );
+  await myBooksCollection.updateOne(
+    { _id: new ObjectId(borrow.bookId) },
+    { $inc: { availableCopies: 1 } },
+  );
+
+  res.send({ success: true });
+});
 
 app.listen(PORT, () => {
   console.log(`my port is running successfully ${PORT}`);

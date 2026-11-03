@@ -115,6 +115,30 @@ app.get('/my-books/:email', async (req, res) => {
   }
 });
 
+app.patch('/all-books/:id', async (req, res) => {
+  const { id } = req.params;
+  const data = req.body;
+
+  const result = await userCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: data },
+  );
+  await myBooksCollection.updateOne(
+    { _id: new ObjectId(id) },
+    { $set: data },
+  );
+
+  res.json(result);
+});
+
+app.delete('/all-books/:id', async (req, res) => {
+  const { id } = req.params;
+
+  const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
+  await myBooksCollection.deleteOne({ _id: new ObjectId(id) });
+
+  res.json(result);
+}); 
 
 app.listen(PORT, () => {
   console.log(`my port is running successfully ${PORT}`);
